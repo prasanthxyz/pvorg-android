@@ -1,6 +1,11 @@
 package com.pvorg.android.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +69,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -70,6 +78,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pvorg.android.R
@@ -83,6 +92,9 @@ import com.pvorg.android.state.UiState
 import com.pvorg.android.state.ViewerMode
 import com.pvorg.android.ui.components.ActionIcon
 import com.pvorg.android.ui.components.ConfirmDeleteDialog
+import com.pvorg.android.ui.components.LocalSidebarControl
+import com.pvorg.android.ui.components.SidebarControl
+import com.pvorg.android.ui.components.rememberReduceMotion
 import com.pvorg.android.ui.components.StaleCleanupDialog
 import com.pvorg.android.ui.screens.FiltersScreen
 import com.pvorg.android.ui.screens.LibraryScreen
@@ -105,6 +117,7 @@ data class GlobalActions(
 fun PvorgApp(viewModel: AppViewModel, onChooseFolder: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val navigationExpanded by viewModel.navigationExpanded.collectAsStateWithLifecycle()
+    val navigationHidden by viewModel.navigationHidden.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -134,7 +147,7 @@ fun PvorgApp(viewModel: AppViewModel, onChooseFolder: () -> Unit) {
                 Phase.NeedsFolder -> WelcomeScreen(onChooseFolder)
                 is Phase.Loading -> ProgressScreen(phase.progress)
                 is Phase.Failed -> ErrorScreen(phase, onRetry = viewModel::reload, onChooseFolder = onChooseFolder)
-                Phase.Ready -> MainLayout(state, viewModel, navigationExpanded, actions)
+                Phase.Ready -> MainLayout(state, viewModel, navigationExpanded, navigationHidden, actions)
             }
             SnackbarHost(
                 snackbarHost,
@@ -179,7 +192,7 @@ fun PvorgApp(viewModel: AppViewModel, onChooseFolder: () -> Unit) {
 }
 
 @Composable
-private fun MainLayout(state: UiState, viewModel: AppViewModel, navigationExpanded: Boolean, actions: GlobalActions) {
+private fun MainLayout(state: UiState, viewModel: AppViewModel, navigationExpanded: Boolean, navigationHidden: Boolean, actions: GlobalActions) {
     BackHandler(enabled = state.selecting || state.page != Page.VIEWER || state.viewerMode == ViewerMode.VIDEO) {
         when {
             state.selecting -> viewModel.clearSelection()
@@ -190,26 +203,55 @@ private fun MainLayout(state: UiState, viewModel: AppViewModel, navigationExpand
     // Leaving a page drops search focus and the soft keyboard with it.
     val focusManager = LocalFocusManager.current
     LaunchedEffect(state.page) { focusManager.clearFocus() }
-    Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-        NavigationPane(
-            state = state,
-            expanded = navigationExpanded,
-            onExpandedChange = viewModel::setNavigationExpanded,
-            onSelect = viewModel::showPage,
-        )
-        VerticalDivider()
-        Box(Modifier.weight(1f).fillMaxHeight()) {
-            when (state.page) {
-                Page.VIEWER -> ViewerScreen(state, viewModel, actions)
-                Page.FILTERS -> FiltersScreen(state, viewModel, actions)
-                Page.LIBRARY -> LibraryScreen(state, viewModel, actions)
-                Page.GALLERY_MAPPING -> MappingScreen(MappingKind.GALLERIES, state, viewModel, actions)
-                Page.TAG_MAPPING -> MappingScreen(MappingKind.TAGS, state, viewModel, actions)
-                Page.SETTINGS -> SettingsScreen(state, viewModel, actions)
+
+    // Hiding the navigation (spec §4.1): the page reflows into the freed width.
+    // Hiding it while it has keyboard focus moves focus to the toggle.
+    val toggleFocus = remember { FocusRequester() }
+    var navigationHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(navigationHidden) {
+        if (navigationHidden && navigationHasFocus) runCatching { toggleFocus.requestFocus() }
+    }
+    val onToggle = remember(viewModel) { { viewModel.toggleNavigationHidden() } }
+    val unsaved = MappingKind.entries.any { state.session(it).changeCount > 0 }
+    val sidebar = remember(navigationHidden, unsaved, onToggle) { SidebarControl(navigationHidden, unsaved, onToggle, toggleFocus) }
+    val motion = tween<IntSize>(if (rememberReduceMotion()) 0 else SidebarMotionMs, easing = SidebarEasing)
+
+    CompositionLocalProvider(LocalSidebarControl provides sidebar) {
+        Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            // Anchored at its trailing edge, so the pane slides in and out from the leading edge.
+            AnimatedVisibility(
+                visible = !navigationHidden,
+                enter = expandHorizontally(motion, expandFrom = Alignment.End),
+                exit = shrinkHorizontally(motion, shrinkTowards = Alignment.End),
+                modifier = Modifier.onFocusChanged { navigationHasFocus = it.hasFocus },
+            ) {
+                Row {
+                    NavigationPane(
+                        state = state,
+                        expanded = navigationExpanded,
+                        onExpandedChange = viewModel::setNavigationExpanded,
+                        onSelect = viewModel::showPage,
+                    )
+                    VerticalDivider()
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                when (state.page) {
+                    Page.VIEWER -> ViewerScreen(state, viewModel, actions)
+                    Page.FILTERS -> FiltersScreen(state, viewModel, actions)
+                    Page.LIBRARY -> LibraryScreen(state, viewModel, actions)
+                    Page.GALLERY_MAPPING -> MappingScreen(MappingKind.GALLERIES, state, viewModel, actions)
+                    Page.TAG_MAPPING -> MappingScreen(MappingKind.TAGS, state, viewModel, actions)
+                    Page.SETTINGS -> SettingsScreen(state, viewModel, actions)
+                }
             }
         }
     }
 }
+
+/** Sidebar hide / show: about 0.2 s, ease-out (spec §8.5; Material 3 standard decelerate). */
+private const val SidebarMotionMs = 200
+private val SidebarEasing = CubicBezierEasing(0f, 0f, 0f, 1f)
 
 private val Page.icon: ImageVector
     get() = when (this) {
@@ -277,7 +319,12 @@ private fun NavigationPane(state: UiState, expanded: Boolean, onExpandedChange: 
     } else {
         NavigationRail(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            header = { ActionIcon(Icons.Outlined.Menu, "Expand navigation", onClick = { onExpandedChange(true) }) },
+            // 4 dp below the rail's own top padding lines the button up with the top app bar's sidebar toggle.
+            header = {
+                Box(Modifier.padding(top = 4.dp)) {
+                    ActionIcon(Icons.Outlined.Menu, "Expand navigation", onClick = { onExpandedChange(true) })
+                }
+            },
         ) {
             main.forEachIndexed { index, page ->
                 if (index > 0 && main[index - 1].group != page.group) HorizontalDivider(Modifier.width(48.dp).padding(vertical = Spacing.sm))

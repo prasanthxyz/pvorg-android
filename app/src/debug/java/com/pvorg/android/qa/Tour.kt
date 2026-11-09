@@ -54,6 +54,9 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
             return
         }
         vm.setAppearance(Appearance.DARK)
+        // Start from the default navigation, whatever an earlier run left persisted.
+        vm.setNavigationHidden(false)
+        vm.setNavigationExpanded(true)
         delay(800)
         keyboardChecks()
         for (appearance in listOf(Appearance.DARK, Appearance.LIGHT)) {
@@ -170,10 +173,61 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
         vm.showPage(Page.SETTINGS)
         shot("$p-settings")
 
+        hiddenSidebar(p)
+
+        // Showing the sidebar again restores the rail, not the drawer.
         vm.setNavigationExpanded(false)
         vm.showPage(Page.VIEWER)
+        vm.setNavigationHidden(true)
+        delay(600)
+        vm.setNavigationHidden(false)
         shot("$p-viewer-rail", settle = 1_500)
+        expect("Expand navigation")
         vm.setNavigationExpanded(true)
+    }
+
+    /** With the sidebar hidden, pages take the whole width (spec §4.1). */
+    private suspend fun hiddenSidebar(p: String) {
+        vm.showPage(Page.VIEWER)
+        vm.setNavigationHidden(true)
+        indexOf { it.video.filename.endsWith(".mp4") && it.video.contactSheet != null && it.gallery.images.isNotEmpty() }?.let { index ->
+            val player = vm.playerController
+            vm.showCombination(index)
+            delay(600)
+            vm.setViewerMode(ViewerMode.VIDEO)
+            waitUntil(8_000) { player.state.value.isPlaying }
+            // Showing and hiding the sidebar mid-playback resizes the stage without interrupting the video.
+            vm.setNavigationHidden(false)
+            delay(500)
+            vm.setNavigationHidden(true)
+            delay(500)
+            val before = player.state.value.positionMs
+            delay(1_000)
+            check(player.state.value.isPlaying && player.state.value.positionMs > before + 500, "$p: playback continues while the sidebar hides and shows")
+            player.pause()
+            player.seekToFraction(0.4f)
+            shot("$p-hidden-viewer-video", settle = 1_200)
+            expect("Show Sidebar")
+            vm.setViewerMode(ViewerMode.CONTACT_SHEET)
+        }
+        vm.showCombination(0)
+        shot("$p-hidden-viewer-contact-sheet", settle = 2_000)
+
+        vm.showPage(Page.LIBRARY)
+        shot("$p-hidden-library", settle = 1_500)
+
+        // The hidden mapping badges become a dot on the Show Sidebar button.
+        vm.showPage(Page.GALLERY_MAPPING)
+        val rows = state.mappingRows[MappingKind.GALLERIES].orEmpty().take(3)
+        val columns = state.library?.columns(MappingKind.GALLERIES).orEmpty().take(2)
+        rows.forEach { row -> columns.forEach { vm.cycleCell(MappingKind.GALLERIES, row, it) } }
+        shot("$p-hidden-gallery-mapping-changes")
+        expect("Show Sidebar, unsaved mapping changes")
+        vm.requestRevert(MappingKind.GALLERIES)
+        vm.confirmRevert()
+        delay(400)
+        expect("Show Sidebar")
+        vm.setNavigationHidden(false)
     }
 
     /** Real key presses injected by the host through the input system (spec §7.1). */
@@ -184,6 +238,13 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
         check(state.page == Page.FILTERS, "C opens Filters")
         key("KEYCODE_V")
         check(state.page == Page.VIEWER, "V opens the viewer")
+
+        key("CTRL+KEYCODE_BACKSLASH")
+        check(vm.navigationHidden.value, "Ctrl+\\ hides the sidebar")
+        expect("Show Sidebar")
+        key("CTRL+KEYCODE_BACKSLASH")
+        check(!vm.navigationHidden.value, "Ctrl+\\ shows the sidebar again")
+        expect("Hide Sidebar")
 
         val before = state.combinationIndex
         key("KEYCODE_N")
@@ -232,6 +293,8 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
         check(vm.isEditingText, "Focusing search marks text editing")
         text("vcn")
         check(state.page == Page.LIBRARY && state.libraryQuery == "vcn", "Shortcut keys typed in search reach the field (got “${state.libraryQuery}”)")
+        key("CTRL+KEYCODE_BACKSLASH")
+        check(!vm.navigationHidden.value, "Ctrl+\\ leaves the sidebar alone while typing in search")
         key("KEYCODE_ESCAPE")
         check(!vm.isEditingText && state.libraryQuery == "vcn", "Esc leaves the search field and keeps the query")
         vm.setLibraryQuery("")
@@ -258,6 +321,9 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
         request("key $spec")
         delay(500)
     }
+
+    /** Asks the host to confirm a control with this accessibility label is on screen. */
+    private suspend fun expect(contentDescription: String) = request("expect $contentDescription")
 
     private suspend fun text(value: String) {
         request("text $value")

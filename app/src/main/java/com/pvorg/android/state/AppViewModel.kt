@@ -48,6 +48,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _navigationExpanded = MutableStateFlow(prefs.navigationExpanded)
     val navigationExpanded: StateFlow<Boolean> = _navigationExpanded.asStateFlow()
 
+    private val _navigationHidden = MutableStateFlow(prefs.navigationHidden)
+    val navigationHidden: StateFlow<Boolean> = _navigationHidden.asStateFlow()
+
     private val _toasts = MutableSharedFlow<Toast>(extraBufferCapacity = 8)
     val toasts: SharedFlow<Toast> = _toasts.asSharedFlow()
 
@@ -179,6 +182,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         prefs.navigationExpanded = expanded
         _navigationExpanded.value = expanded
     }
+
+    /** Hides or shows the navigation; showing restores the drawer or rail last used (spec §4.1). */
+    fun setNavigationHidden(hidden: Boolean) {
+        prefs.navigationHidden = hidden
+        _navigationHidden.value = hidden
+    }
+
+    fun toggleNavigationHidden() = setNavigationHidden(!_navigationHidden.value)
 
     fun dismissNotice() = _state.update { it.copy(notice = null) }
 
@@ -545,6 +556,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 KeyEvent.KEYCODE_A -> if (state.page == Page.LIBRARY) selectAllVisible() else return false
                 KeyEvent.KEYCODE_S -> state.page.mappingKind?.let(::saveMappings) ?: return false
                 KeyEvent.KEYCODE_R -> reload()
+                KeyEvent.KEYCODE_BACKSLASH -> toggleNavigationHidden()
                 KeyEvent.KEYCODE_F -> if (state.page in setOf(Page.FILTERS, Page.LIBRARY, Page.GALLERY_MAPPING, Page.TAG_MAPPING)) focusSearch() else return false
                 KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL ->
                     if (state.page == Page.LIBRARY && state.selection.isNotEmpty()) requestDelete(state.selection) else return false

@@ -24,9 +24,15 @@ class Preferences(context: Context) {
         get() = prefs.getBoolean(KEY_NAV_EXPANDED, true)
         set(value) = prefs.edit().putBoolean(KEY_NAV_EXPANDED, value).apply()
 
+    /** Whether the navigation (drawer or rail) is hidden; shown is the default (spec §4.1). */
+    var navigationHidden: Boolean
+        get() = prefs.getBoolean(KEY_NAV_HIDDEN, false)
+        set(value) = prefs.edit().putBoolean(KEY_NAV_HIDDEN, value).apply()
+
     private companion object {
         const val KEY_APPEARANCE = "appearance"
         const val KEY_LIBRARY = "libraryUri"
         const val KEY_NAV_EXPANDED = "navigationExpanded"
+        const val KEY_NAV_HIDDEN = "navigationHidden"
     }
 }

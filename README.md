@@ -70,8 +70,8 @@ Debug builds accept two launch extras. Release builds don't contain them.
 - `--es pvorg.qa.library <device path>` opens a library from device storage
   without the folder picker.
 - `--ez pvorg.qa.tour true` walks every page and state in Dark and then Light
-  appearance. It also checks the hardware-keyboard shortcuts with real
-  injected key events.
+  appearance, with the sidebar shown and hidden. It also checks the
+  hardware-keyboard shortcuts with real injected key events.
 
 `scripts/qa-tour.sh` drives the tour on a running emulator or device:
 
@@ -86,7 +86,8 @@ The script does the following:
 2. Copies a fresh fixture into the app's private files folder (via `run-as`).
 3. Takes each screenshot the app asks for, with `adb exec-out screencap`.
 4. Injects the requested keys.
-5. Reports the keyboard checks and any crashes or ANRs from logcat.
+5. Confirms requested accessibility labels are on screen (with `uiautomator`).
+6. Reports the checks and any crashes or ANRs from logcat.
 
 A fixture is any library folder. `pvorg-native/Scripts/make_ui_fixture.sh`
 generates a suitable one. Include a video without a contact sheet, an empty

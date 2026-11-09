@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ViewSidebar
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.Close
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +48,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +69,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -78,6 +83,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.provider.Settings
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -269,13 +275,58 @@ fun EmptyState(
     }
 }
 
-/** A page's top app bar: title, subtitle and actions (spec §4, §15.2). */
+/** Whether the system "Remove animations" setting is on; motion then becomes instant (spec §8.5). */
+@Composable
+fun rememberReduceMotion(): Boolean {
+    val context = LocalContext.current
+    return remember { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }
+}
+
+/** What a page's sidebar toggle needs from the navigation shell (spec §4.1). */
+class SidebarControl(
+    val hidden: Boolean,
+    val hasUnsavedChanges: Boolean,
+    val onToggle: () -> Unit,
+    val focusRequester: FocusRequester,
+)
+
+/** Provided by the navigation shell while the persistent navigation exists. */
+val LocalSidebarControl = compositionLocalOf<SidebarControl?> { null }
+
+/**
+ * Hides and shows the navigation from the leading edge of the top app bar
+ * (spec §4.1). While hidden, a dot stands in for the mapping pages' badges.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SidebarToggle(control: SidebarControl) {
+    val label = if (control.hidden) "Show Sidebar" else "Hide Sidebar"
+    val dot = control.hidden && control.hasUnsavedChanges
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text("$label (Ctrl+\\)") } },
+        state = rememberTooltipState(),
+    ) {
+        IconButton(onClick = control.onToggle, modifier = Modifier.focusRequester(control.focusRequester)) {
+            BadgedBox(badge = { if (dot) Badge() }) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.ViewSidebar,
+                    contentDescription = if (dot) "$label, unsaved mapping changes" else label,
+                    // The panel sits on the trailing side of this glyph; mirror it to the leading side, where the navigation is.
+                    modifier = Modifier.graphicsLayer { scaleX = -1f },
+                )
+            }
+        }
+    }
+}
+
+/** A page's top app bar: sidebar toggle, title, subtitle and actions (spec §4, §4.1, §15.2). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PageTopBar(
     title: String,
     subtitle: String?,
-    navigationIcon: @Composable () -> Unit = {},
+    navigationIcon: @Composable () -> Unit = { LocalSidebarControl.current?.let { SidebarToggle(it) } },
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(

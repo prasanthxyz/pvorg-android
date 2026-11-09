@@ -6,9 +6,10 @@
 # Pushes a fresh copy of the fixture library (pvorg.json, VID/, VID/img/, GAL/)
 # into the app's private files folder, launches the debug build with the
 # debug-only QA extras, and serves the app's requests (logged under the
-# PVORG_TOUR tag): screenshots, injected key presses and typed text. Each
-# request is acknowledged with a broadcast, so the tour never races the host.
-# Exits non-zero when a keyboard check fails or the app crashes.
+# PVORG_TOUR tag): screenshots, injected key presses, typed text and checks
+# that a control with a given accessibility label is on screen. Each request is
+# acknowledged with a broadcast, so the tour never races the host.
+# Exits non-zero when a check fails or the app crashes.
 set -euo pipefail
 
 FIXTURE=${1:-/tmp/pvorg-android-fixture}
@@ -85,6 +86,18 @@ scrub() {
   shots=$((shots + 1))
 }
 
+# Checks that a control with this accessibility label is on screen.
+expect() {
+  local description=$1
+  "$ADB" shell uiautomator dump /data/local/tmp/pvorg-ui.xml </dev/null >/dev/null
+  if "$ADB" shell cat /data/local/tmp/pvorg-ui.xml </dev/null | grep -qF "content-desc=\"$description\""; then
+    passed=$((passed + 1)); echo "  ✓ “${description}” is on screen"
+  else
+    failed=$((failed + 1)); echo "  ✗ “${description}” is not on screen"
+  fi
+  "$ADB" shell rm -f /data/local/tmp/pvorg-ui.xml </dev/null
+}
+
 shots=0 passed=0 failed=0 finished=0
 # Each request arrives within seconds; a minute of silence means the tour stalled.
 while IFS= read -r -t 60 line; do
@@ -94,6 +107,7 @@ while IFS= read -r -t 60 line; do
     "key "*) key "${line#key }"; ack ;;
     "scrub "*) read -r _ name from to <<< "$line"; scrub "$name" "$from" "$to"; ack ;;
     "text "*) "$ADB" shell input text "${line#text }" </dev/null; ack ;;
+    "expect "*) expect "${line#expect }"; ack ;;
     "check PASS "*) passed=$((passed + 1)); echo "  ✓ ${line#check PASS }" ;;
     "check FAIL "*) failed=$((failed + 1)); echo "  ✗ ${line#check FAIL }" ;;
     timeout*) echo "  ! $line" ;;

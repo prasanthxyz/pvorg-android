@@ -3,7 +3,6 @@ package com.pvorg.android.ui.screens
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import android.view.ViewGroup
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -110,6 +109,7 @@ import com.pvorg.android.ui.OverflowMenu
 import com.pvorg.android.ui.components.ActionIcon
 import com.pvorg.android.ui.components.EmptyState
 import com.pvorg.android.ui.components.PageTopBar
+import com.pvorg.android.ui.components.rememberReduceMotion
 import com.pvorg.android.ui.components.Thumbnail
 import com.pvorg.android.ui.theme.Radius
 import com.pvorg.android.ui.theme.Spacing
@@ -469,10 +469,15 @@ private val PreviewHeight = 126.dp
 @Composable
 private fun GallerySlideshow(gallery: Gallery, modifier: Modifier) {
     val context = LocalContext.current
-    val reduceMotion = remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
+    val reduceMotion = rememberReduceMotion()
+    // Decode at the settled size: while the layout animates (hiding or showing
+    // the sidebar), the shown image scales instead of being decoded every frame.
+    var measured by remember { mutableStateOf(IntSize.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
+    LaunchedEffect(measured) {
+        if (size != IntSize.Zero) delay(300)
+        size = measured
+    }
     val order = remember(gallery) { gallery.images.shuffled() }
     var index by remember(gallery) { mutableIntStateOf(0) }
 
@@ -491,7 +496,7 @@ private fun GallerySlideshow(gallery: Gallery, modifier: Modifier) {
         }
     }
 
-    Box(modifier.background(Stage.background).onSizeChanged { size = it }) {
+    Box(modifier.background(Stage.background).onSizeChanged { measured = it }) {
         if (order.isEmpty()) {
             EmptyState(Icons.Outlined.PhotoLibrary, "No Images", "This gallery folder is empty.")
         } else if (size != IntSize.Zero) {
