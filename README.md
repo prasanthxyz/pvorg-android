@@ -1,7 +1,8 @@
 # pvorg-android
 
-The Android tablet app for PVORG: pair videos with image galleries, browse the
-pairings in a viewer, and curate which galleries and tags belong to each video.
+The Android tablet app for PP Video Organizer: pair videos with image
+galleries, browse the pairings in a viewer, and curate which galleries and tags
+belong to each video.
 
 Behavior, data rules and design are specified in [docs/SPEC.md](docs/SPEC.md),
 which is shared byte-for-byte with the macOS (`pvorg-native`) and web

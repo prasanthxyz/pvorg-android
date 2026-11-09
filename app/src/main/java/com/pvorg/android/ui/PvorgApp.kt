@@ -64,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -71,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pvorg.android.R
 import com.pvorg.android.data.LoadProgress
 import com.pvorg.android.domain.Format
 import com.pvorg.android.domain.MappingKind
@@ -237,7 +239,14 @@ private fun NavigationPane(state: UiState, expanded: Boolean, onExpandedChange: 
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ActionIcon(Icons.AutoMirrored.Outlined.MenuOpen, "Collapse navigation", onClick = { onExpandedChange(false) })
-                Text("pvorg", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = Spacing.xs))
+                // The app's name (spec §4.2) wraps to a second line rather than clip at large text sizes.
+                Text(
+                    stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = Spacing.xs, end = Spacing.sm),
+                )
             }
             Spacer(Modifier.height(Spacing.sm))
             Page.Group.entries.filter { it != Page.Group.NONE }.forEach { group ->
@@ -384,7 +393,7 @@ private fun ErrorScreen(phase: Phase.Failed, onRetry: () -> Unit, onChooseFolder
     Text(phase.message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     phase.folderName?.let {
         Text(
-            "pvorg reads its configuration from pvorg.json in the folder “$it”.",
+            "PP Video Organizer reads its configuration from pvorg.json in the folder “$it”.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
             textAlign = TextAlign.Center,

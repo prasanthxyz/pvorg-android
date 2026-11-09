@@ -223,7 +223,7 @@ private fun ContactSheet(combination: Combination, viewModel: AppViewModel) {
         EmptyState(
             Icons.Outlined.GridOn,
             "No Contact Sheet",
-            "Android can’t generate contact sheets. Create one with pvorg on a computer, or play the video.",
+            "Android can’t generate contact sheets. Create one with PP Video Organizer on a computer, or play the video.",
         ) {
             Button(onClick = { viewModel.setViewerMode(ViewerMode.VIDEO) }) { Text("Play Video") }
         }
@@ -541,7 +541,7 @@ private fun ViewerEmptyState(state: UiState, viewModel: AppViewModel, actions: G
         library.videos.isEmpty() -> EmptyState(
             Icons.Outlined.Movie,
             "No Videos",
-            "pvorg didn’t find any videos in the VID folder of “${library.rootName}”.",
+            "PP Video Organizer didn’t find any videos in the VID folder of “${library.rootName}”.",
         ) { Button(onClick = actions.onReload) { Text("Reload Library") } }
         library.galleries.isEmpty() -> EmptyState(
             Icons.Outlined.Collections,
