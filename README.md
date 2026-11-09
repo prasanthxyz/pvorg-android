@@ -5,7 +5,7 @@ galleries, browse the pairings in a viewer, and curate which galleries and tags
 belong to each video.
 
 Behavior, data rules and design are specified in [docs/SPEC.md](docs/SPEC.md),
-which is shared byte-for-byte with the macOS (`pvorg-native`), web
+which is shared byte-for-byte with the macOS (`pvorg-macos`), web
 (`pvorg-web`) and Electron desktop (`pvorg-electron`) apps. This README
 covers building, running and the developer tooling only.
 
@@ -89,6 +89,6 @@ The script does the following:
 5. Confirms requested accessibility labels are on screen (with `uiautomator`).
 6. Reports the checks and any crashes or ANRs from logcat.
 
-A fixture is any library folder. `pvorg-native/Scripts/make_ui_fixture.sh`
+A fixture is any library folder. `pvorg-macos/Scripts/make_ui_fixture.sh`
 generates a suitable one. Include a video without a contact sheet, an empty
 gallery and a misnamed file to cover those states.
