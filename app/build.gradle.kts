@@ -22,7 +22,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 strips the unused Material icons and library code (~48 MB → a few MB).
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -67,7 +69,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.foundation:foundation-layout")
     implementation("androidx.compose.material3:material3")
-    implementation("com.google.android.material:material:1.12.0")
+    // Official Material icon set (thumbs-down, pause, skip ±10 s, filter, grid…); R8 strips the unused icons in release.
+    implementation("androidx.compose.material:material-icons-extended")
 
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.media3:media3-exoplayer:1.4.1")

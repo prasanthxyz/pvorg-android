@@ -1,0 +1,4 @@
+<resources>
+    <!-- Matches the always-dark media stage (spec §8.3). -->
+    <color name="launch_background">#FF0F0F0F</color>
+</resources>
