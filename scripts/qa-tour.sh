@@ -61,6 +61,30 @@ key() {
   if ((${#keys[@]})); then "$ADB" shell input keycombination "${keys[@]}" "$code"; else "$ADB" shell input keyevent "$code"; fi </dev/null
 }
 
+# Drags the video scrubber from one fraction to another with real touch events
+# and screenshots while the finger is still down, showing the frame preview.
+scrub() {
+  local name=$1 from=$2 to=$3 bounds
+  "$ADB" shell uiautomator dump /data/local/tmp/pvorg-ui.xml </dev/null >/dev/null
+  bounds=$("$ADB" shell cat /data/local/tmp/pvorg-ui.xml </dev/null | tr '>' '\n' | grep 'content-desc="Playback position"' | grep -oE 'bounds="[^"]*"' | grep -oE '[0-9]+')
+  "$ADB" shell rm -f /data/local/tmp/pvorg-ui.xml </dev/null
+  if [[ -z $bounds ]]; then echo "  ! scrubber not found for $name"; return; fi
+  local left right top bottom
+  read -r left top right bottom <<< "$(echo $bounds)"
+  local y=$(((top + bottom) / 2))
+  local x0 x1
+  x0=$(awk -v l="$left" -v r="$right" -v f="$from" 'BEGIN { printf "%d", l + (r - l) * f }')
+  x1=$(awk -v l="$left" -v r="$right" -v f="$to" 'BEGIN { printf "%d", l + (r - l) * f }')
+  "$ADB" shell input motionevent DOWN "$x0" "$y" </dev/null
+  for step in 1 2 3 4 5 6; do
+    "$ADB" shell input motionevent MOVE $((x0 + (x1 - x0) * step / 6)) "$y" </dev/null
+  done
+  sleep 1.2  # the preview frame is decoded asynchronously
+  "$ADB" exec-out screencap -p </dev/null > "$OUT/$name.png"
+  "$ADB" shell input motionevent UP "$x1" "$y" </dev/null
+  shots=$((shots + 1))
+}
+
 shots=0 passed=0 failed=0 finished=0
 # Each request arrives within seconds; a minute of silence means the tour stalled.
 while IFS= read -r -t 60 line; do
@@ -68,6 +92,7 @@ while IFS= read -r -t 60 line; do
   case $line in
     "shot "*) "$ADB" exec-out screencap -p </dev/null > "$OUT/${line#shot }.png"; shots=$((shots + 1)); ack ;;
     "key "*) key "${line#key }"; ack ;;
+    "scrub "*) read -r _ name from to <<< "$line"; scrub "$name" "$from" "$to"; ack ;;
     "text "*) "$ADB" shell input text "${line#text }" </dev/null; ack ;;
     "check PASS "*) passed=$((passed + 1)); echo "  ✓ ${line#check PASS }" ;;
     "check FAIL "*) failed=$((failed + 1)); echo "  ✗ ${line#check FAIL }" ;;

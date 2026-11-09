@@ -63,6 +63,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -419,38 +423,47 @@ private fun Scrubber(controller: PlayerController, playback: Playback, modifier:
                 .background(Color.White, CircleShape),
         )
         if (previewMs != null) {
+            // A popup, so the preview isn't squeezed into the 48 dp bar and draws above the video surface.
+            val density = LocalDensity.current
             val previewWidth = 224.dp
             val x = (maxWidth * shown - previewWidth / 2).coerceIn(0.dp, (maxWidth - previewWidth).coerceAtLeast(0.dp))
-            Column(
-                Modifier.offset(x = x, y = (-110).dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                Box(
-                    Modifier
-                        .size(previewWidth, 126.dp)
-                        .clip(RoundedCornerShape(Radius.medium))
-                        .background(Stage.raised),
+            val offset = with(density) { IntOffset(x.roundToPx(), -(PreviewHeight + Spacing.xs + 24.dp + Spacing.sm).roundToPx()) }
+            Popup(offset = offset, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
-                    preview?.let {
-                        androidx.compose.foundation.Image(
-                            it.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                    Box(
+                        Modifier
+                            .size(previewWidth, PreviewHeight)
+                            .clip(RoundedCornerShape(Radius.medium))
+                            .background(Stage.raised)
+                            .border(1.dp, Stage.hairline, RoundedCornerShape(Radius.medium)),
+                    ) {
+                        preview?.let {
+                            androidx.compose.foundation.Image(
+                                it.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
+                    Text(
+                        Format.timecode(previewMs),
+                        style = MaterialTheme.typography.labelMedium.tabular(),
+                        color = Stage.primary,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.75f), CircleShape)
+                            .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
+                    )
                 }
-                Text(
-                    Format.timecode(previewMs),
-                    style = MaterialTheme.typography.labelMedium.tabular(),
-                    color = Stage.primary,
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.7f), CircleShape).padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
-                )
             }
         }
     }
 }
+
+private val PreviewHeight = 126.dp
 
 /** The gallery: shuffled, every 2 s, a 0.3 s crossfade; the next image is decoded before switching (spec §5). */
 @Composable

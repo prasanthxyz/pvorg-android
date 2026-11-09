@@ -70,11 +70,27 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
         vm.showCombination(0)
         shot("$p-viewer-contact-sheet", settle = 2_000)
 
-        vm.setViewerMode(ViewerMode.VIDEO)
-        delay(2_000)
-        vm.playerController.pause()
-        vm.playerController.seekToFraction(0.4f)
-        shot("$p-viewer-video")
+        // Combinations are shuffled, so pick a playable mp4 explicitly (not the .wmv or .mkv).
+        indexOf { it.video.filename.endsWith(".mp4") && it.video.contactSheet != null && it.gallery.images.isNotEmpty() }?.let { index ->
+            val player = vm.playerController
+            vm.showCombination(index)
+            delay(600)
+            vm.setViewerMode(ViewerMode.VIDEO)
+            val started = waitUntil(8_000) { player.state.value.isPlaying }
+            val filename = state.currentCombination?.video?.filename
+            check(started, "$p: $filename plays (status ${player.state.value.status}${player.state.value.failure?.let { ", $it" }.orEmpty()})")
+            delay(1_500)
+            check(player.state.value.positionMs > 500, "$p: playback advances (${player.state.value.positionMs} ms after 1.5 s)")
+            player.pause()
+            player.seekToFraction(0.4f)
+            shot("$p-viewer-video", settle = 1_200)
+            val playback = player.state.value
+            check(!playback.isPlaying && abs(playback.positionMs - playback.durationMs * 4 / 10) < 300, "$p: paused at 40% (${playback.positionMs} of ${playback.durationMs} ms)")
+            // A real touch drag on the scrubber, injected by the host, shows the frame preview.
+            request("scrub $p-viewer-scrubber-preview 0.40 0.70")
+            delay(800)
+            check(abs(player.state.value.positionMs - player.state.value.durationMs * 7 / 10) < 400, "$p: releasing the scrubber seeks to 70% (${player.state.value.positionMs} ms)")
+        }
 
         indexOf { it.video.filename.endsWith(".wmv") }?.let {
             vm.showCombination(it)
@@ -253,12 +269,16 @@ class Tour(private val activity: ComponentActivity, private val vm: AppViewModel
     private suspend fun request(message: String) {
         ack = CompletableDeferred()
         log(message)
-        withTimeoutOrNull(15_000) { ack.await() } ?: log("timeout waiting for host: $message")
+        withTimeoutOrNull(30_000) { ack.await() } ?: log("timeout waiting for host: $message")
     }
 
     private suspend fun waitUntil(condition: () -> Boolean) {
         while (!condition()) delay(200)
     }
+
+    /** Waits up to [timeoutMs]; returns whether the condition became true. */
+    private suspend fun waitUntil(timeoutMs: Long, condition: () -> Boolean): Boolean =
+        withTimeoutOrNull(timeoutMs) { waitUntil(condition); true } ?: false
 
     private fun log(message: String) = Log.i(TAG, message)
 

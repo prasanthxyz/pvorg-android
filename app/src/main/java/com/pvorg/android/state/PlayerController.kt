@@ -139,7 +139,11 @@ class PlayerController(
         _state.value = Playback()
     }
 
-    /** A frame near [atMs], decoded off the main thread and cached per second. */
+    /**
+     * The frame at the start of [atMs]'s second, decoded off the main thread and
+     * cached per second. OPTION_CLOSEST decodes the exact frame; CLOSEST_SYNC
+     * would show the nearest keyframe, which can be seconds away.
+     */
     suspend fun frame(atMs: Long): Bitmap? {
         val location = _state.value.location ?: return null
         val second = (atMs / 1000).coerceAtLeast(0)
@@ -147,7 +151,7 @@ class PlayerController(
         return withContext(frameDispatcher) {
             runCatching {
                 val retriever = retrieverFor(location)
-                retriever.getScaledFrameAtTime(second * 1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 448, 252)
+                retriever.getScaledFrameAtTime(second * 1_000_000, MediaMetadataRetriever.OPTION_CLOSEST, 448, 252)
             }.getOrNull()?.also { if (_state.value.location == location) frames.put(second, it) }
         }
     }
