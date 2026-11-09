@@ -6,7 +6,7 @@ belong to each video.
 
 Behavior, data rules and design are specified in [docs/SPEC.md](docs/SPEC.md),
 which is shared byte-for-byte with the macOS (`pvorg-native`), web
-(`pvorg-web`) and Electron desktop (`PP-Video-Organizer`) apps. This README
+(`pvorg-web`) and Electron desktop (`pvorg-electron`) apps. This README
 covers building, running and the developer tooling only.
 
 ## Stack
