@@ -5,9 +5,9 @@ galleries, browse the pairings in a viewer, and curate which galleries and tags
 belong to each video.
 
 Behavior, data rules and design are specified in [docs/SPEC.md](docs/SPEC.md),
-which is shared byte-for-byte with the macOS (`pvorg-native`) and web
-(`pvorg-web`) apps. This README covers building, running and the developer
-tooling only.
+which is shared byte-for-byte with the macOS (`pvorg-native`), web
+(`pvorg-web`) and Electron desktop (`PP-Video-Organizer`) apps. This README
+covers building, running and the developer tooling only.
 
 ## Stack
 
